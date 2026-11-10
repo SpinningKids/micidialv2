@@ -72,24 +72,32 @@ python v2/audio.py
 #    node_modules terser)
 node v2/min_synth.js
 
-# 5. assemble: container + bootstrap splice -> micidial_v2.html (repo root)
+# 4b. boot minification: v2/boot.js -> v2/build/boot.min.js (3,798 B source
+#     -> 2,948 B minified / 1,317 deflated; compress:false keeps the eval
+#     completion value usable)
+node v2/min_boot.js
+
+# 5. assemble: section container + page-safe embedding -> micidial_v2.html
+#    (repo root); output written as BYTES (no CRLF translation)
 python v2/assemble.py
 ```
 
 Runtime *sources* embedded by assemble.py, not generated:
-`v2/boot.js` (decoder, section 0) and `v2/build/shell.html` (DOM shell, section
-9 — hand-written, see §7.4). Inputs `v2/build/outer.js` comes from stage 1b:
+`v2/boot.js` (decoder, section 0; shipped minified as section 0) and
+`v2/build/shell.html` (DOM shell, section 9 — hand-written, see §7.4). Inputs
+`v2/build/outer.js` comes from stage 1b:
 
 ```text
 # 1b. outer-JS extractor: writes v2/build/outer.js (byte-exact js[vend:] slice)
 python v2/iface.py
 ```
 
-Verification rerun of the §3 pipeline from the stripped tree (2026-11-10)
-reproduced `micidial_v2.html` **byte-for-byte** (sha-256 `f61d875c…d6a1f`,
-67,041 B on disk, 6 CRLF pairs). After the rerun all regeneratable artifacts
-were deleted again: at final cleanup `v2/build/` holds **only `shell.html`**
-(the hand-written input); the §3 commands recreate everything else on demand.
+A rerun of the §3 pipeline (2026-11-10, ported-synth profile, windows-1252
+embedding) produces `micidial_v2.html` at **65,288 B — 248 B under the
+65,536 cap**. The page's 10 sections were verified round-trip byte-exact
+through the shipped embed + split + inflate path in headless Chrome. After a rerun all regeneratable artifacts can be
+deleted again: at final cleanup `v2/build/` holds **only `shell.html`** (the
+hand-written input); the §3 commands recreate everything else on demand.
 `iface.py` rewrites `engine.js` and `project.json` and `compile.py` rewrites
 `model32.pkl` on every run — these three are diagnostic outputs read by no
 pipeline stage, so delete them after any rerun.
@@ -294,19 +302,28 @@ drone — approximating the original engine's sound.
 
 ### 9.1 Container
 
-ONE **deflate-raw** stream over
+**Per-section deflate.** The container is *not* deflated as a whole. It is:
 
 ```text
-[u16 BE sectionCount][u32 LE len ×N][concatenated bodies][pad to %4 with \x00]
+[u16 BE sectionCount][u32 LE len ×N][section body ×N]
 ```
+
+where **each body is its own deflate-raw stream** (`zlib.compress(b, 9,
+wbits=-15)`) and each `len` is the *compressed* length; there is no 4-byte
+padding (no base85 alignment anymore). The page bootstrap splits by lens and
+inflates each section separately before running boot.js. Measured today the
+10 per-section streams sum to **63,484 deflated** vs 65,110 for the old
+single stream — compressing separately avoids deflate's 32 KB window not
+crossing section boundaries (the old §9.1 shipped 51,938 B per-section vs
+52,792 single; same ~1.6–2 % effect, now realized instead of documented).
 
 Section order (index is contractual between assemble.py and boot.js):
 
 | idx | section | current raw | current deflate-alone |
 |---|---|---|---|
-| 0 | boot.js text (v2/boot.js verbatim) | 3,798 | 1,600 |
-| 1 | outer.js verbatim (v2/build/outer.js) | 62,846 | 21,912 |
-| 2 | synth.min.js text | 7,939 | 3,649 |
+| 0 | boot.min.js (terser of v2/boot.js) | 2,948 | 1,317 |
+| 1 | outer.js verbatim (v2/build/outer.js) | 62,852 | 21,912 |
+| 2 | synth.min.js text | 50,521 | 15,478 |
 | 3 | stream.bin (§7.1) | 26,261 | 15,164 |
 | 4 | statics.txt (§7.2) | 38,446 | 2,120 |
 | 5 | pv.json (§7.3) | 102,084 | 3,708 |
@@ -315,48 +332,87 @@ Section order (index is contractual between assemble.py and boot.js):
 | 8 | skeleton.json | 2,033 | 216 |
 | 9 | shell.html | 1,766 | 960 |
 
-Inflated container 253,504 B → deflated payload 52,792 B (shipped single
-stream). Note: deflating the 10 sections **separately** sums to 51,938 B —
-854 B SMALLER than the single stream currently shipped (deflate's 32 KB window
-can't cross-pollinate across section boundaries). A per-section container
-(lens already exist in the format) would win ~0.8 KB today.
+Sum of per-section deflates 63,484 + 42 B header = **63,526 container bytes**
+(embedded same size, see §9.2), vs 65,110 for a single whole-container
+stream. boot.js receives the plain (inflated) sections, exactly like before.
 
-### 9.2 Packing + bootstrap splice
+### 9.2 Page-safe embedding
 
-Payload bytes are packed with a **custom base85**: 5 chars per 4-byte big-end
-group (zero-padded final group) over an 85-char alphabet of printable ASCII:
+The html declares **`<meta charset=windows-1252>`** (v13's own pre is reused
+verbatim with only that attribute swapped). The payload rides the page
+**nearly raw (1.0 bytes/byte)** inside a single-byte encoding window instead
+of base85's 1.25.
 
-```text
-!"#$%&()*+,-./0123456789:;=>?@A-Z[]^_`a-x
-```
-
-(excludes exactly `'` `<` `\` `y` `z` `{` `|` `}` `~` — so the blob is safe
-inside single-quoted JS strings; this is v1's legacy alphabet, see
-`original/PRESSURE_ATBS135_v13.html`.)
-
-`assemble.py` splices `original/PRESSURE_ATBS135_v13.html`: it locates v1's
-decoder head (`…})(` before its own payload) and reuses everything up to that
-call-open. The shipped page's `<script>` is:
+**Why windows-1252 and not x-user-defined:** the first shipped build used
+`charset=x-user-defined` (byte↔U+F780 arithmetic) — current Chrome does not
+honor that label and decodes the file as cp1252 anyway (verified 2026-11-10
+by probe: raw 0x80→U+20AC, 0x9F→U+0178, while undefined slots 0x81/0x8D/0x8F/
+0x90/0x9D stay identity). The fix keeps the same layout but treats the DOM as
+what it really is:
 
 ```text
-<v13 base85-decoder async-fn head …>})(
-  '<BASE85 BLOB>','<ALPHABET>');     ← v1 head decodes base85 → bytes u
-  let d=new TextDecoder();
-  let b=await new Response(new Blob([u]).stream()
-      .pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
-  let D=new Uint8Array(b), n=D[0]<<8|D[1], L[], p=2; ← container lens
-  let off=2+4*n, S[]; … S.push(D.subarray(off,off+L[i])); …
-  await eval(d.decode(S[0]))(S);     ← run boot.js, pass sections
-)().catch(e=>document.body.textContent="BDE PACK ERROR · "+e)
+cp1252 payload chars (DOM side, c = codePointAt(0)):
+  c === 42 ('*')  -> escaped pair, byte = next char's code − 1, consume 2
+  c in CP (27 chars from bytes 0x80..0x9F minus the 5 undefined slots)
+                  -> byte = hex table H[2j..2j+1]    (embedded 54-char lookup)
+  else            -> byte = c            (identity incl. 0x00..0x7F, 0xA0..0xFF
+                                          and the 5 undefined cp1252 slots)
 ```
 
-HTML pre/post around `<script>` are copied verbatim from the v13 page; the
-DOM shell lives in section 9 (fix #0003 — the v13 head's own body markup
-cannot be used because v2 runs the engine asynchronously). The final file is
-written with `Path.write_text` → 6 CRLF pairs on Windows (67,041 bytes on
-disk vs 67,034 chars).
+`CP` is embedded as a 27-char JS literal of the *raw* bytes 0x80..0x9F — at
+runtime `C.charCodeAt(j)` reads exactly the chars cp1252 decoding produced
+for those same bytes (self-referential but consistent). Both table lookups
+are **bound-guarded** (`j<27`): without the guard, any payload byte outside
+CP (e.g. 0x81) spins the `while` forever — this hang was caught by the first
+headless debug run before shipping.
 
-## 10. Runtime decoder (`v2/boot.js`, section 0 — 3,798 B text)
+Transport: the payload lives inside a JS block comment
+`/* PAYLOAD */` in the one `<script>`; the bootstrap reads it via
+`document.currentScript.textContent`, slices between the first `/*` and last
+`*/`, and applies the decode above.
+
+Assemble escapes exactly the bytes the HTML tokenizer would corrupt, with 1
+byte of overhead each (`'*' + (b+1)&0xFF`):
+
+| escaped byte | why | count in real payload |
+|---|---|---|
+| 0x00 (NUL) | HTML tokenizer turns NUL into U+FFFD | 242 |
+| 0x0D (CR) | tokenizer normalizes CR→LF (and CRLF→LF) | 244 |
+| 0x2A (`*`) | would close the `*/` wrapper; also serves as escape marker | 226 |
+
+Total +712 B on the real payload. Two script-data traps are *asserted
+absent* at assemble time (probability ~2⁻³² per build of a hit):
+`<!--` (enters script-data-escaped state) and `</script` (closes the
+element). The marker-vs-payload scheme is unambiguous because the escaped
+bytes `(b+1)&0xFF` are 0x01/0x0E/0x2B — all tokenizer-safe, outside the
+marker itself.
+
+This replaces the old base85 packing (Q10's v1-legacy splice). The v1 decoder
+head (`function ca…})('BLOB','ALPHABET')`) is **no longer spliced** — the
+shipped page carries its own ~630 B bootstrap:
+
+```text
+<v13 pre verbatim (charset=windows-1252)>
+<script>
+  (async()=>{ … unwrap comment -> bytes (marker pairs + cp1252 inverse table) ->
+    split by u16/u32 lens -> per-section DecompressionStream("deflate-raw") -> S[] …
+    await eval(TextDecoder().decode(S[0]))(S);
+  })().catch(e=>document.body.textContent="BDE PACK ERROR · "+e)
+/*
+<BASE85 REPLACED BY: escaped binary container payload>
+*/
+</script>
+<post verbatim>
+```
+
+The final file is written with `Path.write_bytes` — **no CRLF translation**
+(the old 6-CRLF-pairs artifact of §9.2's `write_text` is gone). All page-side
+code is ASCII-only except the 27-byte CP table literal (asserted). Verified
+2026-11-10 in headless Chrome via an instrumented bootstrap: all 10 sections
+round-trip byte-exact through the shipped decode+split+inflate path, and the
+real page boots to the shell (setup screen, no BDE PACK error).
+
+## 10. Runtime decoder (`v2/boot.js`, section 0 — source 3,798 B; shipped minified as `v2/build/boot.min.js`, 2,948 B)
 
 boot.js is `(async S=>{…})`: an async IIFE receiving the section array.
 Step order (must mirror §7 exactly):
@@ -406,7 +462,7 @@ profile `--rdp=1 --quant=100 --tol=0.011`):
 | Q7 | Audio **full re-composition**: original atbs-v04 worklet (96,684 chars) + project JSON (308,452 B) replaced by procedural `synth.js` + blob | §8 | **Behavioral parity only** — no bound; sound is an approximation. User verifies by ear. The single biggest intentional loss. |
 | Q8 | Audio quantization: automation anchors RDP eps 1.0 on `round(v·100)` (i.e. 0.01 units); vel/prob `round(v·100)` **clamped 0..127** (caps at 1.27); acid/drums `ratchet≥2` boolean flag (≥2 collapses); gate steps 2-bit {0,.5,1} | `audio.py blob()` | ≤0.005 per quantized value + clamp; ratchet values ≥2 indistinguishable; {0,.5,1} universe exact (asserted). |
 | Q9 | Audio sparse-probability encoding: only `prob<1` entries stored (prob==1 implicit) | `audio.py` + `synth.js st()` | **lossless** over the assert-verified data universe. |
-| Q10 | Container (deflate-raw + base85) | §9 | **lossless**. |
+| Q10 | Container: **per-section deflate-raw streams** + windows-1252 page-safe embedding (cp1252 inverse table for 27 special bytes, NUL/CR/`*` escape pairs, §9.2) | `assemble.py` | **lossless** — all 10 sections verified byte-exact through the shipped decode+split+inflate path in headless Chrome; real page boots to shell. Supersedes the old whole-container deflate + base85 splice. x-user-defined variant was shipped once and FAILED in-browser (#0007): Chrome ignores that label. |
 
 Improvement rules: (a) any new lossy knob gets a table row in memory + here;
 (b) tightening a Q-bound buys size proportionally — budget headroom/deficit is
@@ -415,7 +471,17 @@ number.
 
 ## 12. Current state and open issues (as of 2026-11-10)
 
-- `micidial_v2.html`: 67,041 B on disk — **1,505 B OVER cap** (65,536).
+- `micidial_v2.html`: **65,288 B on disk — 248 B UNDER cap** (65,536).
+  Profile: ported narrowed synth (§8, Q7) + per-section deflate container +
+  windows-1252 embedding with cp1252 inverse table (§9). Earlier numbers in
+  this section (67,041 B, "1,505 B over") were measured against the 7,939 B
+  draft synth slot and were stale — the ported synth costs 15,478 deflated;
+  with base85 the file would have been 82,425 B. Logged in memory as issue
+  #0006; resolution = Q10 packing replacement + boot.min.js (user-approved
+  decision, 2026-11-10). The x-user-defined variant of that decision shipped
+  at 65,137 B and FAILED in-browser (#0007, Chrome ignores the label); the
+  windows-1252 rebuild costs +151 B (inverse table + bounds) and was verified
+  by browser-side per-section ledger + headless DOM boot.
   Earlier 9-section build (no shell section) was 65,361 B.
 - Issue #0002 FIXED (memory, 2026-11-10): after wiping `v2/build/` (stale,
   mixed-generation inputs) and re-running the full §3 pipeline from scratch,
@@ -431,8 +497,8 @@ number.
 
 ## 13. Improvement levers (analysis starting points)
 
-1. ~854 B free from per-section deflate (§9.1 note) — immediate, no quality
-   loss; combined with the 1,505 B deficit this halves the gap.
+1. ~~Per-section deflate~~ **CONSUMED 2026-11-10** — shipped (§9.1): the
+   10-section container now compresses each section separately.
 2. `pv.json` (102,084 raw / 3,708 deflated): P.v layer defs are record data
    the compiler could fold into the track model like statics (§5.5), or strip
    defaults as v1's MINIFY_PLAN did.
@@ -442,24 +508,27 @@ number.
    latent gap #0005.
 4. `object:9` (5,985 records ≈ 22% of records, cycle names) — candidate for a
    procedural loop rule instead of fitted curves (memory idea).
-5. Broader entropy coding behind the 64 KiB cap: a tiny custom LZ/arithmetic
-   decoder in the bootstrap if deflate misses (memory idea).
+5. ~~Broader entropy coding behind the 64 KiB cap~~ — the cap is met
+   (65,288 B, 248 B headroom) with the §9.2 embedding; revisit only if content
+   grows.
 6. Rerun knobs sweep: `--sweep` writes model32.pkl per profile; compare
    deflated stream + deviation per Q-bound before shipping.
 7. `outer.js` (62.8 KB → 21.9 KB): only remaining non-remade big asset;
    terser savings were only ~300 chars pre-deflate, but shader-literal
    dedup vs the GLSL pool (8 literals) and cross-section pooling may help
-   (try: shaders as their own section for pool isolation).
+   (try: shaders as their own section for pool isolation). Constraint: outer.js
+   must stay byte-identical (user requirement) — only pooling/packing levers.
 
 ## 14. Reproduction appendix + repo inventory (post-cleanup)
 
 ACTIVE pipeline files (keep, needed to rerun):
 `v2/compile.py`, `v2/iface.py`, `v2/audio_extract.py` (new producer for
 audio.pkl), `v2/audio.py`, `v2/min_synth.js` (uses root `node_modules`
-terser), `v2/synth.js`, `v2/boot.js`, `v2/assemble.py`,
+terser), `v2/min_boot.js` (same, for boot.js — `compress:false` keeps the
+eval completion arrow alive), `v2/synth.js`, `v2/boot.js`, `v2/assemble.py`,
 `v2/build/shell.html` (hand-written input),
 `original/uncompressed.html` (input), `original/PRESSURE_ATBS135_v13.html`
-(splice reference), `micidial_v2.html` (output).
+(pre/post donor), `micidial_v2.html` (output).
 
 Deleted 2026-11-10 (superseded probes/prototypes/drafts + stale or
 regeneratable build artifacts — each was superseded by an active file, see

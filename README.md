@@ -23,7 +23,8 @@ reconstructed cheaply at load time:
   keeps the render error within tolerance.
 - **Audio** — the 96 KB audio worklet + 308 KB editor JSON are replaced by a
   compact *procedural synth remake* (`v2/synth.js`) plus a quantized pattern
-  blob (`v2/audio.py` → `audio.bin`).
+  blob extracted from the source (`v2/audio_extract.py` → `audio.pkl`, then
+  `v2/audio.py` → `audio.bin`).
 - **Everything else** — outer engine JS, GLSL shaders, and static scene config
   are kept byte-identical and pooled into one deflate-raw container.
 
@@ -36,11 +37,12 @@ All lossy choices carry explicit, bounded error tolerances (see
 |---|---|---|
 | Input (`original/uncompressed.html`) | ~5.36 MB | — |
 | v1 ([SpinningKids/micidial](https://github.com/SpinningKids/micidial)) `original/PRESSURE_ATBS135_v13.html` | 657 KB | lossless entropy packing |
-| **v2** `micidial_v2.html` | **~67 KB** | semantic re-modeling + runtime decode |
+| v2 v0.1 `micidial_v2_v01.html` | 67,041 B | semantic re-modeling + runtime decode (over cap) |
+| **v2 v0.2 `micidial_v2_v02.html`** | **65,288 B** | semantic re-modeling + runtime decode (**under cap**) |
 
-> Current status: the clean-tree build is byte-for-byte reproducible, but sits
-> ~1.5 KB over the 64 KiB cap. See [`MICIDIAL_V2.md`](MICIDIAL_V2.md) §1 / §12 for
-> the exact numbers and the remaining improvement levers (§13).
+> v0.2 is the current release. It ships **65,288 bytes — 248 B under the**
+> **64 KiB (65,536 byte) cap**. See [`MICIDIAL_V2.md`](MICIDIAL_V2.md) §12 for
+> exact numbers and [`CHANGELOG.md`](CHANGELOG.md) for what changed from v0.1.
 
 ## Repository layout
 
@@ -49,7 +51,8 @@ All lossy choices carry explicit, bounded error tolerances (see
 | `original/` | Reference artifacts: the uncompressed input (5.36 MB) and the v1-compressed page (657 KB, navigation/reference only — do **not** modify). |
 | `original/PRESSURE_ATBS135_v13.html` | The **v1**-compressed page (657 KB), from the upstream repo [SpinningKids/micidial](https://github.com/SpinningKids/micidial). Kept here as navigation/reference only. |
 | `tools/` | Stage-1 / stage-2 analysis tooling for the target file (budget, scene census, decompression probes). |
-| `v2/` | The Micidial **v2** compiler pipeline (`compile.py`, `iface.py`, `audio_extract.py`, `audio.py`, `assemble.py`, `boot.js`, `synth.js`). |
+| `v2/` | The Micidial **v2** compiler pipeline (`compile.py`, `iface.py`, `audio_extract.py`, `audio.py`, `min_synth.js`, `assemble.py`, `boot.js`, `synth.js`). |
+| `v2/build/shell.html` | The only build artifact committed by hand — the DOM shell injected at runtime. Every other file in `v2/build/` is regeneratable from the pipeline and not kept. |
 | `.projectmem/` | Persistent project memory + workflow rules (managed by [`pjm`](https://www.google.com)); never hand-edit. |
 
 ## Running the v2 pipeline
@@ -77,8 +80,22 @@ node v2/min_synth.js
 python v2/assemble.py
 ```
 
+> Every file produced in `v2/build/` except `shell.html` is a regeneratable
+> build artifact — the tree above reproduces them all from `original/`. Only
+> `shell.html` is authored by hand and committed; keep the working tree clean of
+> the rest (see [`AGENTS.md`](AGENTS.md)).
+
 See [`MICIDIAL_V2.md`](MICIDIAL_V2.md) §3 for full flag documentation and §7 for
 the byte-exact wire formats.
+
+## Version history
+
+| Version | Artifact | Size | Key changes |
+|---------|----------|------|-------------|
+| **v0.2** (current) | `micidial_v2_v02.html` | 65,288 B | Per-section deflate-raw container + `windows-1252` cp1252 page-safe encoding (replaces base85 + single-stream deflate); minified boot.js (2,948 B); entirely new hand-written procedural synth (50,521 B raw, achieving parity with the original atbs-v04 audio). Sections 3–9 unchanged from v0.1. |
+| v0.1 | `micidial_v2_v01.html` | 67,041 B | Single whole-container deflate-raw + base85 (1.25x expansion); unminified boot.js (3,798 B); legacy synth.js (7,939 B). 1,505 B over the 64 KiB cap. |
+
+See [`CHANGELOG.md`](CHANGELOG.md) for the full v0.1 → v0.2 changelog.
 
 ## Documentation
 
