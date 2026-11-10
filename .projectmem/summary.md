@@ -30,6 +30,7 @@ self-contained HTML that renders identically in a standard browser.
 - Audio blob loss accepted: automation anchors RDP-reduced at eps 1.0 on round(v*100) (0.01 units); vel/prob *100 clamped 0..127 (caps at 1.27); ratchet>=2 boolean collapse; gate steps 2-bit {0,.5,1}; prob==1 implicit (lossless over asserted universe). Sound itself is a procedural atbs-v04 remake... [v2/audio.py]
 - Cleanup 2026-11-10: deleted superseded scratch (compiler.py, compiler2.py, dead build.py, floor.py, iface2.py, interp_err.py, protocol.py, shapes.py, ties.py-7, synth_draft*.js.txt, test_synth.js, boot.min.js, unpack_orig.py, __pycache__, root nul) + tools one-shot probes; added audio_extract.py... [v2/]
 - FINAL cleanup policy 2026-11-10 (strictens prior Cleanup decision): keep ONLY rerun inputs. v2/: compile.py, iface.py, audio_extract.py, audio.py, assemble.py, min_synth.js, synth.js, boot.js + build/shell.html. v2/build/ holds ONLY shell.html (hand-written input); all other build files are...
+- Repo initialized & published to GitHub: origin = https://github.com/SpinningKids/micidialv2.git, branch master (not main); initial import tagged v0.1 with README.md.
 
 ## Notes
 - P.a structure: P.a=['gzip', base64(gzip(JSON [w, song]))]. w = the ENTIRE audio worklet source (96,684 B, the 'engine' — NOT a separate const in the HTML). song = full editor project JSON (308,452 B, schemaVersion 1.6.0, keys...

@@ -35,7 +35,7 @@ All lossy choices carry explicit, bounded error tolerances (see
 | Artifact | Size | Method |
 |---|---|---|
 | Input (`original/uncompressed.html`) | ~5.36 MB | — |
-| v1 (micidial) `original/PRESSURE_ATBS135_v13.html` | 657 KB | lossless entropy packing |
+| v1 ([SpinningKids/micidial](https://github.com/SpinningKids/micidial)) `original/PRESSURE_ATBS135_v13.html` | 657 KB | lossless entropy packing |
 | **v2** `micidial_v2.html` | **~67 KB** | semantic re-modeling + runtime decode |
 
 > Current status: the clean-tree build is byte-for-byte reproducible, but sits
@@ -47,7 +47,7 @@ All lossy choices carry explicit, bounded error tolerances (see
 | Path | Purpose |
 |---|---|
 | `original/` | Reference artifacts: the uncompressed input (5.36 MB) and the v1-compressed page (657 KB, navigation/reference only — do **not** modify). |
-| `micidial/` | Micidial **v1** engine + verifiers. Documentation of how v1 compresses; **do not modify**. |
+| `original/PRESSURE_ATBS135_v13.html` | The **v1**-compressed page (657 KB), from the upstream repo [SpinningKids/micidial](https://github.com/SpinningKids/micidial). Kept here as navigation/reference only. |
 | `tools/` | Stage-1 / stage-2 analysis tooling for the target file (budget, scene census, decompression probes). |
 | `v2/` | The Micidial **v2** compiler pipeline (`compile.py`, `iface.py`, `audio_extract.py`, `audio.py`, `assemble.py`, `boot.js`, `synth.js`). |
 | `.projectmem/` | Persistent project memory + workflow rules (managed by [`pjm`](https://www.google.com)); never hand-edit. |
