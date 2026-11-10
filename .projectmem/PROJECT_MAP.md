@@ -23,7 +23,21 @@ self-contained HTML that renders identically in a standard browser.
   - `tools/probe_inner.py`, `tools/snap_count.py` — P.a / P.s structure probes
   - `tools/analyze_scene.py` — rough segment anatomy
   - `tools/decompress.py` — stage-1 static decoder for PRESSURE_ATBS135_v13.html
-- `v2/` — micidial v2 Scene Compiler (to be built)
+- `v2/` — micidial v2 Scene Compiler + procedural audio engine
+  - `v2/compile.py` — stage 1: loads P from uncompressed.html, RDP keyframe
+    reduction, track fitting, writes v2/build/{stream.bin,statics.txt,
+    pv.json,meta.json,skeleton.json,model32.pkl}
+  - `v2/iface.py` — stage 1b: extracts outer engine JS → v2/build/outer.js
+  - `v2/audio_extract.py` — stage 2: P.a → v2/build/audio.pkl (worklet src + song)
+  - `v2/audio.py` — stage 3: song → v2/build/audio.bin quantized blob
+    (layout documented in file header)
+  - `v2/synth.js` — procedural atbs-v04 worklet remake (class D synth +
+    class Lt processor)
+  - `v2/min_synth.js` — stage 4: terser-minifies synth.js → build/synth.min.js
+  - `v2/boot.js` — runtime decoder/section 0: rebuilds P, writes shell, runs outer
+  - `v2/assemble.py` — stage 5: container (10 sections, deflate-raw) +
+    base85 (+v1 bootstrap splice) → micidial_v2.html
+  - `v2/build/shell.html` — hand-written DOM shell input (only kept build file)
 - `.projectmem/` — project memory (summary.md derived; never hand-edit it)
 
 ## Key facts about the target (`original/uncompressed.html`)
@@ -42,11 +56,20 @@ self-contained HTML that renders identically in a standard browser.
   parametric reconstruction is mandatory.
 
 ## Relationships
-- `v2/extract.py` reads `original/uncompressed.html` → scene model for the compiler.
-- `v2` runtime (JS) expands fitted tracks back to the exact original `P`
-  structure, then runs the v1-style payload path like
-  `micidial/tools/minify.py`'s bootstrap (DecompressionStream).
-- Verifiers in `micidial/tools/` (browser_test.js, verify_html.js) reuse for v2.
+- `v2/compile.py` reads `original/uncompressed.html` → scene model, writes
+  the binary/JSON sections consumed by `v2/boot.js` (stream.bin format is
+  byte-exact in MICIDIAL_V2.md §7.1).
+- `v2/assemble.py` packs boot.js + outer.js + synth.min.js + scene stream +
+  statics + pv/meta/skeleton + audio.bin + shell.html into ONE deflate-raw
+  container, splices v1's bootstrap head, writes `micidial_v2.html`.
+- `v2/boot.js` (section 0) inflates + reconstructs `P`, injects shell.html
+  (section 9), then runs outer.js as `new Function('P', …)`; audio runs as
+  `P.a = ['json', [synthSrc, audioBin]]` honoring the atbs-v04 message
+  protocol `{state, play, stop}`.
+- `v2/synth.js` (class D) consumes `v2/build/audio.bin` verbatim
+  (producer = `v2/audio.py`); `class Lt` is the AudioWorkletProcessor.
+- `v2/audio_extract.py` reads `original/uncompressed.html` `P.a` →
+  `v2/build/audio.pkl`; `v2/audio.py` reads that pickle.
 
 ## Gotchas
 - To parse `P` out of the script use `json.JSONDecoder().raw_decode` at

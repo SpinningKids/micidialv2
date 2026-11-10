@@ -31,18 +31,19 @@ self-contained HTML that renders identically in a standard browser.
 - Cleanup 2026-11-10: deleted superseded scratch (compiler.py, compiler2.py, dead build.py, floor.py, iface2.py, interp_err.py, protocol.py, shapes.py, ties.py-7, synth_draft*.js.txt, test_synth.js, boot.min.js, unpack_orig.py, __pycache__, root nul) + tools one-shot probes; added audio_extract.py... [v2/]
 - FINAL cleanup policy 2026-11-10 (strictens prior Cleanup decision): keep ONLY rerun inputs. v2/: compile.py, iface.py, audio_extract.py, audio.py, assemble.py, min_synth.js, synth.js, boot.js + build/shell.html. v2/build/ holds ONLY shell.html (hand-written input); all other build files are...
 - Repo initialized & published to GitHub: origin = https://github.com/SpinningKids/micidialv2.git, branch master (not main); initial import tagged v0.1 with README.md.
+- README updated: removed all micidial/ folder refs, linked upstream v1 repo https://github.com/SpinningKids/micidial; pushed to origin/master (synced after a pre-existing remote divergence). micidial/ dir already absent.
 
 ## Notes
-- P.a structure: P.a=['gzip', base64(gzip(JSON [w, song]))]. w = the ENTIRE audio worklet source (96,684 B, the 'engine' — NOT a separate const in the HTML). song = full editor project JSON (308,452 B, schemaVersion 1.6.0, keys...
-- Wire format invariants for runtime boot decoder (compile.py v3.3): stream = [roles: uvb n + (len+utf8)*][per scene: uvb vocabN, per vocab: uvb lenN + uvb rid*][per cluster: svb dt, uvb sid][tracks until EOF: per track: uvb rid, uvb grid-or-uniqN, KIND byte (0 const,1 lin,2 quad,3 runs,4 knots,5...
-- High churn detected: v2\synth.js (4 edits in 10 min) [v2\synth.js]
-- High churn detected: v2\min_synth.js (4 edits in 10 min) [v2\min_synth.js]
-- High churn detected: v2\compile.py (4 edits in 10 min) [v2\compile.py]
 - High churn detected: v2\assemble.py (4 edits in 10 min) [v2\assemble.py]
 - Final HTML generated: micidial_v2.html 65,361 B (<65,536). Container sections 9, deflated 51.6KB, base85 encoded. Boot decoder with varint/regen implemented.
 - Record names collapsed to constant id 0 in the P.s stream: probe verified names are never parsed/looked up by the engine (zero violations). Lossless vs runtime behavior, but any future feature that reads record names would break. Logged as Q5 in MICIDIAL_V2.md §11. [v2/compile.py]
 - Reference doc: MICIDIAL_V2.md (repo root) = complete v2 operating spec - pipeline commands (compile.py, iface.py, audio_extract.py, audio.py, min_synth.js, assemble.py), byte-exact wire formats, container/base85 layout, boot.js runtime, and quality-degradation table with verified error bounds... [MICIDIAL_V2.md]
 - lesson: a file literally named 'nul' (Windows reserved device name, created by a shell redirect slip) cannot be deleted via cmd/PowerShell rm; os.remove(r'\\?\C:\abs\path\nul') with the \?\ prefix works — it bypasses device-name resolution. Used during 2026-11-10 cleanup. [.]
+- Full §3 pipeline rerun from stripped tree (2026-11-10 session) reproduces micidial_v2.html BYTE-FOR-BYTE: sha256 F61D875C…D6A1F (67,034 chars/67,041 B, still 1,505 B over cap). Audio stages exact: audio.bin 3,724→1,929 defl; synth.min.js 7,939→3,651 defl; compile validation 0 hard mismatches... [v2/]
+- v2/audio.py cleanup: removed stray debug line print('sha:', re.escape('')) and unused re/Counter imports; re-ran — audio.bin byte-identical (3,724 B, 1,929 deflated). Any pipeline stage that greps audio.py output is unaffected. [v2/audio.py]
+- Headless synth verification method (no browser, no verifier policy violation — pure offline): run v2/synth.js in Node vm with stub AudioWorkletProcessor + registerProcessor, feed v2/build/audio.bin via {type:'state'}, {type:'play'}, drain scheduled events via E.ev, render E.sp() samples checking... [v2/synth.js]
+- Audio/visual timeline alignment check: song blob covers 1,744 steps at 135 BPM = 193.45 s vs intro's total visual duration 193.78 s (sum of P.s scene durations, 62 scenes — verified from uncompressed.html). Last acid/stab/drone events at 193.45 s; visuals end 0.33 s later. Aligned. [v2/audio.py]
+- Audio engine OFFLINE VERIFICATION PASSED (Node vm smoke, real audio.bin): 9.41M samples (~3.6 min = full song) rendered, 0 NaN, max |out| 1.49 (soft-limiter engaged, >1 will web-clamp — buy-ear check for loudness vs original pending, Q7), max concurrent voices 121 (bounded, no loss), 3,431... [v2/synth.js]
 
 ## Key files
 - `original/PRESSURE_ATBS135_v13.html`

@@ -45,10 +45,19 @@ deflate vs the 52.4 KB post-base85 cap).
       defl budget: uvb/svb parse, cluster->records, track regen, statics
       pool re-JSON) — must match compile.py stream format exactly
       (NO project-side verifier: user verifies the output themselves)
-- [ ] Audio: extract pattern/state JSON from project (`AS` object);
+- [x] Audio: extract pattern/state JSON from project (`AS` object);
       quantize; write `St_min`+`Lt` wrapper (~2-4 KB) speaking the same
       atbs-v04 protocol; P.a rebuilt in decoder (engine replaced by synth
       strings; project JSON slimmed to what outer.js reads)
+      ← DONE: v2/audio_extract.py → audio.pkl, v2/audio.py → audio.bin
+      (3,724 B → 1,929 defl), v2/synth.js procedural atbs-v04 remake
+      (7,939 B → 3,651 defl after terser), wired via boot.js section 2/7
+      as `P.a=['json',[synthSrc, blob]]`. Full pipeline rerun 2026-11-10
+      reproduced micidial_v2.html byte-for-byte (sha f61d875c…d6a1f).
+      Headless synth smoke test (Node): blob parse OK (28 song scenes,
+      1,744 steps ≈ 3.2 min, 22 auto-tracks; events 2,164 drums + 915
+      acid + 352 stab; voice kinds 0/1/2/3 all exercised). Sound fidelity
+      still user-verified-by-ear (Q7).
 - [ ] QUALITY-LOSS POLICY: every accepted design choice that can degrade
       output quality vs the original (keyframe RDP eps, float requant
       grid/tol, audio re-composition quantization/clamping, and any future

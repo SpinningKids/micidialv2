@@ -32,8 +32,6 @@ import json
 import os
 import pickle
 import zlib
-import re
-from collections import Counter
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 BUILD = os.path.join(ROOT, 'build')
@@ -182,8 +180,6 @@ def main():
     d = len(zlib.compress(b, 9, wbits=-15))
     print(f'audio blob: {len(b):,} raw -> deflate {d:,}')
     open(os.path.join(BUILD, 'audio.bin'), 'wb').write(b)
-    # per-section deflate estimate
-    print('sha:', re.escape(''))
 
 
 if __name__ == '__main__':
