@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Project memory runtime state (regenerable)
+.projectmem/events.jsonl
+.projectmem/watch.pid
+.projectmem/watch.log
+.projectmem/structure.json
+
+# Build artifacts / regenerables from the v2 pipeline
+v2/build/*.bin
+v2/build/*.json
+v2/build/*.txt
+v2/build/*.pkl
+v2/build/synth.min.js
+micidial_v2.html
