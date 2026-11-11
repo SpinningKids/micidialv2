@@ -1,5 +1,11 @@
 # Micidial v2 Changelog
 
+## [Unreleased] — Documentation
+
+### Added
+- `MICIDIAL_V2_USER_GUIDE.md` — AI agent reference for running the micidial v2 pipeline: 5-stage build commands, tuning parameters (`--rdp`, `--quant`, `--tol`), size budget breakdown (current 65,288 B / 248 B headroom), quick levers + structural levers when output exceeds 64 KiB, validation rules, cleanup, and steps to adapt for a new input HTML.
+- `ABTS_OPTIMIZATION_GUIDE.md` — AI agent reference for the ABTS demo system (generator of uncompressed HTML): 5 structural invariants micidial v2 exploits, tiered optimizations (animation curve compressibility, audio pattern schema, outer JS minification, P.v folding), exact audio blob schema with field requirements, anti-patterns table, validation checklist, and `compile.py`/`audio_extract.py` locations to update if ABTS output structure changes.
+
 ## [v0.2] — `micidial_v2_v02.html` (65,288 B — 248 B under the 64 KiB cap)
 
 ### Changes from v0.1
