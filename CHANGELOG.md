@@ -1,10 +1,20 @@
 # Micidial v2 Changelog
 
-## [Unreleased] — Documentation
+## [v0.3] — variant processing + storage trim (2026-11-11)
 
 ### Added
-- `MICIDIAL_V2_USER_GUIDE.md` — AI agent reference for running the micidial v2 pipeline: 5-stage build commands, tuning parameters (`--rdp`, `--quant`, `--tol`), size budget breakdown (current 65,288 B / 248 B headroom), quick levers + structural levers when output exceeds 64 KiB, validation rules, cleanup, and steps to adapt for a new input HTML.
+- `MICIDIAL_V2_USER_GUIDE.md` — AI agent reference for running the micidial v2 pipeline: 5-stage build commands, tuning parameters (`--rdp`, `--quant`, `--tol`), size budget breakdown, quick + structural levers when output exceeds 64 KiB, validation rules, cleanup, and steps to adapt for a new input HTML (§10b now covers the **full flow from a compressed ABTS demo page**: container unpack → payload un-bootstrap → P-key diff → `--src=` stages → shipped-section reuse → variant assemble → offline verification).
 - `ABTS_OPTIMIZATION_GUIDE.md` — AI agent reference for the ABTS demo system (generator of uncompressed HTML): 5 structural invariants micidial v2 exploits, tiered optimizations (animation curve compressibility, audio pattern schema, outer JS minification, P.v folding), exact audio blob schema with field requirements, anti-patterns table, validation checklist, and `compile.py`/`audio_extract.py` locations to update if ABTS output structure changes.
+- **Variant pipeline**: `--src=<page>` input override on `compile.py`, `iface.py`, `audio_extract.py`; `assemble.py` gained `--out`/`--shell`/`--carrier`.
+- `tools/` variant tooling (permanent): `decompress_any.py` (any v1 container → payload), `unwrite_page.js` (`document.write` payload → real page, needed for v21+), `diff_pages.py` (generic P-key scoping diff), `extract_shipped.py` (decode a shipped page's embed into its 10 sections), `verify_page.js` (Chrome-faithful windows-1252 offline boot check).
+- `v2/min_boot.js` restored — stage 4b (`terser compress:false`) reproduces `boot.min.js` byte-exact (2,948 B, sha `067fa093`).
+- `micidial_v2_v21.html` — variant build of the **v21** ABTS page: **65,299 B, 237 B under the 64 KiB cap**, profile `--rdp=1.8 --quant=100 --tol=0.011` (quality row Q11: kept 3,726/30,839 records, 0 hard mismatches, worst float deviation 0.01). Baseline v13 build unchanged at 65,288 B.
+
+### Changes
+- `v2/assemble.py` rewritten as the committed v0.2-layout producer (carrier pre/post + decoder code harvested from the shipped page; per-section deflate + cp1252 comment embedding). Rebuilds decode byte-exact through the shipped path but are not byte-identical to `micidial_v2.html`: current zlib finds better matches than the older build that shipped it (63,115 vs 63,484 deflated B).
+
+### Removed
+- `original/uncompressed.html` (5.36 MB) — deleted to save storage; functionally regeneratable with `tools/decompress_any.py` + `tools/unwrite_page.js` from `original/PRESSURE_ATBS135_v13.html` (output is 27 B shorter than the browser-decoded page — Node lacks `document.write` tag auto-insertion; pipeline anchors unaffected). Byte-exact copy remains in git history. Notarized in project memory and `MICIDIAL_V2.md` §3/§14.
 
 ## [v0.2] — `micidial_v2_v02.html` (65,288 B — 248 B under the 64 KiB cap)
 

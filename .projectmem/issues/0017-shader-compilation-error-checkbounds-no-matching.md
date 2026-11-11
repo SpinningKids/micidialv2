@@ -1,0 +1,4 @@
+# #0017 Shader compilation error: 'checkBounds' : no matching overloaded function found, '!' : wrong operand type. Function likely declared after use in shader (GLSL requires forward declaration or definition before use), or signature mismatch.
+
+- 2026-11-11T08:49:55Z `issue`: Shader compilation error: 'checkBounds' : no matching overloaded function found, '!' : wrong operand type. Function likely declared after use in shader (GLSL requires forward declaration or definition before use), or signature mismatch. [v2/hybrid_shader_p5.glsl]
+- 2026-11-11T08:53:21Z `fix`: Fixed GLSL function ordering issue. Root cause: checkBounds() was defined AFTER scene() function, but GLSL requires functions to be defined before use (no hoisting). Moved checkBounds() definition to before scene() function. Now checkBounds at position 3429, scene at 3509. Shader compiles without 'no matching overloaded function found' error. HTML: 64,842 bytes (694 B under cap).

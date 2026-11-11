@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Find the audio contract between outer JS and inner engine."""
-import json, os, re
+import json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TARGET = os.path.join(ROOT, 'original', 'uncompressed.html')
+# --src=<page> overrides the input page (variant processing, see projectmem)
+_src = next((x.split('=', 1)[1] for x in sys.argv[1:] if x.startswith('--src=')), None)
+if _src: TARGET = _src
 BUILD = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'build')
 os.makedirs(BUILD, exist_ok=True)
 

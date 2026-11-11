@@ -10,7 +10,12 @@
 
 - Python 3.10+ with standard library (`json`, `zlib`, `pickle`, `re`, `os`, `sys`)
 - Node.js with `terser` in project root `node_modules` (for minification steps)
-- Input file: `original/uncompressed.html` (the 5.36 MB source)
+- Input file: `original/uncompressed.html` (5.36 MB) — NOT committed anymore;
+  functionally regen it: `python tools/decompress_any.py
+  original/PRESSURE_ATBS135_v13.html tmp/payload.js` then `node
+  tools/unwrite_page.js tmp/payload.js original/uncompressed.html` (byte-exact
+  copy stays in git history), or skip it entirely and build from any compressed
+  ABTS page (§10b).
 
 ---
 
@@ -180,19 +185,67 @@ rm -rf v2/build/{stream.bin,statics.txt,pv.json,meta.json,skeleton.json,audio.bi
 
 ## 10. Modifying for a New Input HTML
 
-If you receive a **new version of `uncompressed.html`**:
+### 10a. Plain uncompressed page (`uncompressed.html`-shaped)
 
 1. Replace `original/uncompressed.html` with the new file
 2. Run the full pipeline (§2)
 3. If output > 64 KiB, apply tuning (§4)
 4. Validate visually in browser (no automated verifier per user directive)
 
+### 10b. Any v1-compressed ABTS demo page (`PRESSURE_ATBS135_vN.html`)
+
+Start from the compressed file; variant tools live in `tools/`, working outputs
+in `tmp/` (repo hygiene):
+
+1. **Unpack the v1 container**: base85 blob inside `<script>` → deflate-raw:
+   `python tools/decompress_any.py original/PRESSURE_ATBS135_vN.html tmp/payload_vN.js`
+2. **Recover the real page**. v13 AND v21+ payloads are a
+   `document.open();document.write("…")` bootstrap — evaluate it with a stubbed
+   DOM: `node tools/unwrite_page.js tmp/payload_vN.js tmp/uncompressed_vN.html`
+   (Node's stub misses the browser's auto-inserted `<html>/<head>/<body>` tags —
+   a 27 B gap harmless to the pipeline's anchors).
+3. **Scope the change** vs the v13 baseline (regen it per §1 — the baseline file
+   is not committed): `python tools/diff_pages.py <new> tmp/v13_page.html`
+   prints per-P-key diffs, record counts, head/tail lengths. Anything `IDENTICAL`
+   (in v21 that was `a,b,d,n,q,t,x`) needs no stage re-run.
+4. **Compile from the variant without touching the baseline input** — all three
+   source-reading stages take `--src=`:
+   `python v2/compile.py --src=tmp/uncompressed_vN.html --rdp=1 --quant=100 --tol=0.011`
+   `python v2/iface.py --src=tmp/uncompressed_vN.html`
+   `python v2/audio_extract.py --src=tmp/uncompressed_vN.html`
+5. **Audio**: re-run `v2/audio.py` + `v2/min_synth.js` only if `P.a` differs
+   (diff step 3 tells you); otherwise the existing `audio.bin` is reusable.
+6. **Runtime sections**: repo `v2/boot.js`/`v2/synth.js` may not match the
+   shipped runtime (`v2/synth.js` is a stale draft — issue #0020). Safest: reuse
+   byte-exact shipped sections: `python tools/extract_shipped.py micidial_v2.html tmp/shipped`,
+   then copy `boot.min.js` + `synth.min.js` into `v2/build/`. (Regenerating
+   `boot.min.js` with `node v2/min_boot.js` IS byte-exact; `outer.js` from
+   `iface.py` is byte-exact by construction.)
+7. **Shell**: extract the DOM head of the variant page — everything before
+   `<script>` — to `tmp/shell_vN.html` (the hand-written `v2/build/shell.html`
+   is v13-specific).
+8. **Assemble**: `python v2/assemble.py --out=micidial_v2_vN.html --shell=tmp/shell_vN.html`
+   (carrier pre/post + decoder code are harvested from `--carrier`, default
+   `micidial_v2.html`).
+9. **Over cap?** Sweep `--rdp` down-fit per §4 and ship the smallest eps with
+   **0 hard mismatches** in compile.py's validation. Mandatory: record the
+   measured deviation in MICIDIAL_V2.md §11 Q-table AND project memory
+   (v21: eps 1.8 → 65,299 B, worst deviation 0.01; eps 1.0 was 2,026 B over,
+   eps 1.75 missed by 25 B — see Q11).
+10. **Verify offline** (browser check is user-side):
+    `python tools/extract_shipped.py micidial_v2_vN.html tmp/vN_sections` — every
+    decoded section must byte-match its `build/`/shell input (`cmp`), then
+    `node tools/verify_page.js micidial_v2_vN.html tmp/shell_vN.html` — Chrome-
+    faithful windows-1252 decode + carrier decoder + boot stub must print
+    `shell written: EXACT`; the engine dying at WebGL offline is expected.
+
 **Assumptions that must hold for the new input**:
 - Same `P` structure: keys `x,t,d,q,b,n,s,v,a` with `s` = 62 scenes
-- Same role set in snapshots (`background`, `camera`, `light:1`, `light:2`, `object:1..10`)
 - Same fixed payload skeleton per role (verified by `compile.py` asserts)
 - Times on 4-decimal grid (`t = m/10000`)
 - Audio contract: `P.a = ['json', [workletSrc, projectObj]]` with same pattern schema
+- Roles are NOT fixed — compile.py handles any role set generically (v21 added
+  `light:3`); only the skeleton per role must match.
 
 If structure differs, you'll need to update probes in `compile.py` (walk_values, skeleton extraction, statics normalization).
 
@@ -201,18 +254,34 @@ If structure differs, you'll need to update probes in `compile.py` (walk_values,
 ## 11. Quick Reference Commands
 
 ```bash
-# Full rebuild from clean
+# Full rebuild from clean (baseline v13 input)
 rm -rf v2/build/*
 python v2/compile.py --rdp=1 --quant=100 --tol=0.011
 python v2/iface.py
 python v2/audio_extract.py
 python v2/audio.py
 node v2/min_synth.js
-node v2/min_boot.js
+node v2/min_boot.js         # stage 4b; byte-exact vs shipped boot.min.js
 python v2/assemble.py
 
+# Variant build from a compressed ABTS page (v21 example, full flow §10b)
+python tmp/decompress_any.py original/PRESSURE_ATBS135_v21.html tmp/v21_payload.js
+node tools/unwrite_page.js tmp/v21_payload.js tmp/uncompressed_v21.html
+python tools/decompress_any.py original/PRESSURE_ATBS135_v13.html tmp/v13_payload.js
+node tools/unwrite_page.js tmp/v13_payload.js tmp/v13_page.html
+python tools/diff_pages.py tmp/uncompressed_v21.html tmp/v13_page.html
+python v2/compile.py --src=tmp/uncompressed_v21.html --rdp=1.8 --quant=100 --tol=0.011
+python v2/iface.py --src=tmp/uncompressed_v21.html
+python v2/audio_extract.py --src=tmp/uncompressed_v21.html && python v2/audio.py
+python tools/extract_shipped.py micidial_v2.html tmp/shipped
+cp tmp/shipped/boot.min.js tmp/shipped/synth.min.js v2/build/
+python -c "p=open('tmp/uncompressed_v21.html',encoding='utf-8').read();open('tmp/shell_v21.html','w',encoding='utf-8').write(p[:p.find('<script')])"
+python v2/assemble.py --out=micidial_v2_v21.html --shell=tmp/shell_v21.html
+python tools/extract_shipped.py micidial_v2_v21.html tmp/v21_sections   # cmp each section
+node tools/verify_page.js micidial_v2_v21.html tmp/shell_v21.html       # shell EXACT
+
 # Size check
-ls -la micidial_v2.html
+ls -la micidial_v2*.html
 
 # Explore profiles
 python v2/compile.py --rdp=2 --quant=200 --tol=0.02 --sweep

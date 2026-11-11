@@ -65,8 +65,10 @@ def svb(n):
 # ---------------------------------------------------------------- extraction
 
 
-def load():
-    s = open(TARGET, encoding='utf-8').read()
+def load(path=None):
+    # --src=<page> overrides the input page (variant processing, see projectmem)
+    src = path or next((x.split('=', 1)[1] for x in sys.argv[1:] if x.startswith('--src=')), TARGET)
+    s = open(src, encoding='utf-8').read()
     i0, i1 = s.find('<script>'), s.find('</script>')
     js = s[i0 + 8:i1]
     vi = js.find('const P=') + len('const P=')

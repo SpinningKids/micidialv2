@@ -6,10 +6,13 @@ Pulls P.a = ['json', [w, song]] out of original/uncompressed.html and pickles
 v2/audio.py, which reads ['song']). Re-derived from original/uncompressed.html,
 so the previously-orphan audio.pkl becomes reproducible.
 """
-import json, os, pickle
+import json, os, pickle, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TARGET = os.path.join(ROOT, 'original', 'uncompressed.html')
+# --src=<page> overrides the input page (variant processing, see projectmem)
+_src = next((x.split('=', 1)[1] for x in sys.argv[1:] if x.startswith('--src=')), None)
+if _src: TARGET = _src
 BUILD = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'build')
 os.makedirs(BUILD, exist_ok=True)
 
