@@ -7,7 +7,7 @@
 This repository is versioned and pushed to:
 
 ```
-https://github.com/SpinningKids/micidialv2.git   (remote origin, branch main)
+https://github.com/SpinningKids/micidialv2.git   (remote origin, branch master)
 ```
 
 - Versioning follows SemVer (`MAJOR.MINOR.PATCH`). Tag releases as `v<version>`.

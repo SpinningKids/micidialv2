@@ -8,21 +8,16 @@ intro `original/uncompressed.html` (5.36 MB) below 64 KiB while remaining a
 self-contained HTML that renders identically in a standard browser.
 
 ## Structure
-- `original/` — reference artifacts
-  - `original/uncompressed.html` — the compressed-source's ORIGINAL page, recovered in stage 1 (5,359,781 B). Compression target.
-  - `original/PRESSURE_ATBS135_v13.html` — v1-engine-compressed page (657,106 B); navigation/reference only.
-- `micidial/` — micidial v1 engine (documentation of how v1 compresses; DO NOT modify)
-  - `micidial/REBUILD.md` — v1 rebuild procedure
-  - `micidial/MINIFY_PLAN.md` — v1 plan: entropy packing (gzip payload ~450 B bootstrap)
-  - `micidial/tools/minify.py` — v1 pipeline: sentinels → terser → gzip-9 → base64 payload
-  - `micidial/tools/*.js` — v1 verifiers (diff_engine, verify_html, glsl_diff, browser_test, eval_literals)
-  - `micidial/tools/node_modules/` — Playwright install (canonical; not scratch)
-- `tools/` — stage-1/2 analysis tooling for the TARGET file
-  - `tools/budget.py` — byte budget + gzip-9 entropy floor of uncompressed.html
-  - `tools/scene_census.py` — P.s snapshot census (26,982 records, role histogram)
-  - `tools/probe_inner.py`, `tools/snap_count.py` — P.a / P.s structure probes
-  - `tools/analyze_scene.py` — rough segment anatomy
-  - `tools/decompress.py` — stage-1 static decoder for PRESSURE_ATBS135_v13.html
+- `original/` — reference artifacts (uncompressed input is NOT committed; regenerate via `tools/decompress_any.py` + `tools/unwrite_page.js`)
+  - `original/PRESSURE_ATBS135_v13.html` — v1 page, baseline input for the v2 pipeline (657,106 B)
+  - `original/PRESSURE_ATBS135_v21.html` — v21 variant page (735,341 B); uses `--src=` profile Q11 (`--rdp=1.8`)
+- `tools/` — permanent variant tooling (all committed)
+  - `tools/decompress.py`, `tools/decompress_any.py` — v1 container → payload decoder (any `PRESSURE_ATBS135_vN.html`)
+  - `tools/unwrite_page.js` — `document.write` payload → real uncompressed page (Node)
+  - `tools/diff_pages.py` — generic P-key scoping diff between two pages (argv A B)
+  - `tools/extract_shipped.py` — decode a shipped micidial_v2 page's embed into its 10 sections
+  - `tools/verify_page.js` — Chrome-faithful windows-1252 offline boot check
+- `tmp/` — untracked scratch from the v21 variant experiments (`uncompressed_v21.html`, `v21_r*.html` sweep, `v21_sections/`, `shipped/`)
 - `v2/` — micidial v2 Scene Compiler + procedural audio engine
   - `v2/compile.py` — stage 1: loads P from uncompressed.html, RDP keyframe
     reduction, track fitting, writes v2/build/{stream.bin,statics.txt,
@@ -34,10 +29,13 @@ self-contained HTML that renders identically in a standard browser.
   - `v2/synth.js` — procedural atbs-v04 worklet remake (class D synth +
     class Lt processor)
   - `v2/min_synth.js` — stage 4: terser-minifies synth.js → build/synth.min.js
+  - `v2/min_boot.js` — stage 4b: terser (compress:false) minifies boot.js → build/boot.min.js (2,948 B, byte-exact reproducer)
   - `v2/boot.js` — runtime decoder/section 0: rebuilds P, writes shell, runs outer
-  - `v2/assemble.py` — stage 5: container (10 sections, deflate-raw) +
-    base85 (+v1 bootstrap splice) → micidial_v2.html
-  - `v2/build/shell.html` — hand-written DOM shell input (only kept build file)
+  - `v2/assemble.py` — stage 5 (committed v0.2-layout producer since v0.3): per-section deflate + windows-1252 cp1252 comment embedding + carrier harvested from the shipped page; options `--src/--out/--shell/--carrier`. Baseline output = `micidial_v2.html` (65,288 B on disk; not byte-identical to the shipped file — current zlib compresses better than the old build)
+  - `v2/build/shell.html` — hand-written DOM shell input; the ONLY committed build file (others are gitignored regenerables; `boot.min.js`, `engine.js`, `outer.js` were not covered by .gitignore and showed up as untracked in the working tree)
+- Root artifacts (tracked): `micidial_v2_v01.html` (67,041 B, over cap), `micidial_v2_v02.html` (65,288 B, under cap), `micidial_v2_v21.html` (65,299 B variant build). Working `micidial_v2.html` (65,288 B, md5 b16e6195… = byte-identical copy of v02) is gitignored build output.
+- Docs (all tracked): `MICIDIAL_V2.md` (operating spec; §12 = current state), `README.md`, `CHANGELOG.md`, `MICIDIAL_V2_USER_GUIDE.md` (run guide + variant flow §10b), `ABTS_OPTIMIZATION_GUIDE.md` (generator-side invariants), `V02_PIPELINE.md` (older v0.2-era writeup), `AGENTS.md` / `CLAUDE.md` (agent rules). README claims a LICENSE file that does not exist.
+- `package.json` — root Node deps: terser ^5.51.2 only (`node_modules/` gitignored; drives min_synth.js / min_boot.js).
 - `.projectmem/` — project memory (summary.md derived; never hand-edit it)
 
 ## Key facts about the target (`original/uncompressed.html`)
@@ -59,9 +57,11 @@ self-contained HTML that renders identically in a standard browser.
 - `v2/compile.py` reads `original/uncompressed.html` → scene model, writes
   the binary/JSON sections consumed by `v2/boot.js` (stream.bin format is
   byte-exact in MICIDIAL_V2.md §7.1).
-- `v2/assemble.py` packs boot.js + outer.js + synth.min.js + scene stream +
-  statics + pv/meta/skeleton + audio.bin + shell.html into ONE deflate-raw
-  container, splices v1's bootstrap head, writes `micidial_v2.html`.
+- `v2/assemble.py` packs boot.min.js + outer.js + synth.min.js + scene stream +
+  statics + pv/meta/skeleton + audio.bin + shell.html into per-section deflate
+  streams embedded page-safely (cp1252 inverse table + `*` escapes for NUL/CR),
+  reusing the carrier code from a shipped page; writes `micidial_v2.html` /
+  variant output via `--out`.
 - `v2/boot.js` (section 0) inflates + reconstructs `P`, injects shell.html
   (section 9), then runs outer.js as `new Function('P', …)`; audio runs as
   `P.a = ['json', [synthSrc, audioBin]]` honoring the atbs-v04 message
@@ -76,4 +76,5 @@ self-contained HTML that renders identically in a standard browser.
   `const P=`; brace-matching breaks (escaped quotes inside P's strings).
 - Windows bash quoting: avoid inline `python -c` with quotes/backslashes —
   write to a script file under `tools/` instead.
-- Playwright must run from `micidial/tools/node_modules` (copy scripts there).
+- Offline parity checks run through plain Node (`tools/verify_page.js`, `tools/unwrite_page.js`) — no Playwright/browser harness is needed (the `micidial/tools/node_modules` Playwright install was removed in ac4c1b9; root `node_modules/` holds only terser).
+

@@ -1,11 +1,10 @@
 # MICIDIAL_V2.md — Micidial v2: complete operating specification
 
-Status snapshot (verified 2026-11-10): shipped artifact `micidial_v2.html` =
-**67,041 bytes on disk** (10 container sections, inflated container 253,504 B,
-blob 65,990 base85 chars) — i.e. **1,505 B OVER the 65,536 cap**. Page load
-now OK: the clean-tree rebuild of 2026-11-10 resolved `BDE PACK ERROR ·
-TypeError: Failed to fetch` — issue #0002 FIXED in memory (user-verified). See
-§12 for exact status and §13 improvement levers.
+Status snapshot (verified 2026-11-19): shipped artifact `micidial_v2.html` =
+**65,288 bytes on disk** — **248 B UNDER the 65,536 cap**. Consistent
+with §12 below. Page load now OK: the clean-tree rebuild of 2026-11-10 resolved
+`BDE PACK ERROR · TypeError: Failed to fetch` — issue #0002 FIXED in memory
+(user-verified). See §12 for exact status and §13 improvement levers.
 
 ---
 
@@ -39,7 +38,7 @@ All lossy choices have explicit, bounded error tolerances (§8).
 |---|---|---|---|
 | v1 (micidial) | `original/PRESSURE_ATBS135_v13.html` | 657,106 B | lossless entropy packing (terser + single gzipped payload + ~450 B bootstrap). Fully documented in `micidial/REBUILD.md` — DO NOT modify that folder. |
 | Stage 1 | `original/uncompressed.html` | 5,359,781 B | the v1 page browser-self-decoded back to its original uncompressed form; v2's input. `tools/decompress.py` is the static stage-1 decoder. |
-| v2 | `micidial_v2.html` | 67,041 B (current) | this document. |
+| v2 | `micidial_v2.html` | 65,288 B (regenerable) | this document. |
 
 The v2 container **reuses v1's bootstrap head**: `assemble.py` locates
 `original/PRESSURE_ATBS135_v13.html`'s decoder-function prefix and keeps it

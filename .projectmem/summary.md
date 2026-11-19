@@ -1,6 +1,6 @@
 # projectmem - micidial_v2
 
-_Last updated: 2026-11-11_
+_Last updated: 2026-11-19_
 
 ## Project purpose
 Build "micidial v2": a scene compiler that compresses the single-file WebGL
@@ -47,16 +47,16 @@ self-contained HTML that renders identically in a standard browser.
 - original/uncompressed.html removed from repo (storage; supersedes prior claim): byte-exact copy lives in git history (git restore source HEAD~). Functional regen = tools/decompress_any.py + tools/unwrite_page.js; output is 27 B SHORTER than browser-decoded page because Node lacks document.write... [original/]
 
 ## Notes
-- v0.2 unpacked: 10 sections recovered. Shader (20.9K chars), outer.js (92K), boot.js (3K), scene stream (26K), audio (3.7K). Engine is full raymarcher with 7 primitives, 11 modifiers, CSG, thin-film, glass, volumetrics, AO, bloom, lens flare, motion blur. Decoder handles 6 track kinds... [v2/build/v02_unpack]
-- New rule established: keep reusable tools (unpack_v02.py, check_alphabet.py) in tools/ directory. Temporary tools deleted after use. v0.3 pipeline: compile.py -> audio_extract.py -> audio.py -> min_synth.js -> iface.py -> assemble.py -> micidial_v2_v03.html [tools/]
-- Pre-delivery validation: test micidial_v2_v04.html in browser/headless to ensure no 'BDE PACK ERROR · SyntaxError: Invalid or unexpected token' at launch. This catches shader/JS syntax issues from the P5+P1 patch. [tools/patch_shader.py]
-- Parse error 'missing ) after argument list' was caused by HTML structure differences between assemble.py output and working hybrid template. Fixed by generating HTML from working hybrid template structure. Shader optimizations (P1+P5) increase size by ~1.5KB over 64KiB cap. [tools/generate_v04_from_hybrid.py]
-- gotcha: v1-compressed pages >= v21 use a document.open/document.write('...') bootstrap instead of new Function(payload); payload HTML has JS-string escapes (\" \n). Decompress = base85+deflate-raw (tools/decompress.py logic) THEN eval payload with stubbed document (tmp/unwrite_page.js) to... [original/PRESSURE_ATBS135_v21.html]
 - v21 demo vs v13: P.a/x/t/d/q/b/n identical; P.s all 62 scenes changed, records 26,982->30,839 (+14%); P.v all 62 differ; engine tail 62,866->65,681 chars; head 1,790->1,770. Eval run: v2 must retool for any ABTS-generated page [original/]
 - variant tooling (tmp/): decompress_any.py = generic v1 container decoder (any PRESSURE_ATBS135_vN.html -> payload); unwrite_page.js = recovers real page from document.write payloads; diff_v13_v21.py = P-key scoping diff. v21 decompressed page lives in tmp/uncompressed_v21.html [tmp/]
 - note: shipped micidial_v2.html defl streams came from an older zlib build; current Python 3.13 zlib compresses the same raw sections SMALLER (defl sum 63,115 vs 63,484). Rebuilds with assemble.py are byte-different but decode-identical; verification = extract shipped embed, byte-compare inflated... [v2/assemble.py]
 - variant tooling now PERMANENT in tools/ (not tmp/): decompress_any.py (v1 container -> payload), unwrite_page.js (document.write payload -> real page), diff_pages.py (generic P-key scoping diff, argv A B), extract_shipped.py (decode shipped embed -> sections), verify_page.js (Chrome-faithful... [tools/]
 - gotcha: v13 payload IS also a document.write bootstrap (not runnable JS); unwrite_page output misses browser auto-inserted html/head/body tags (+27 B vs committed page) — fine for pipeline, never claim byte-exact regen from tools alone [tools/unwrite_page.js]
+- Docs drift: README says 'License: see LICENSE' but no LICENSE file exists in repo; AGENTS.md claims remote branch 'main' while git is on master at origin https://github.com/SpinningKids/micidialv2.git. [README.md / AGENTS.md]
+- MICIDIAL_V2.md header snapshot is stale: lines 3-8 say shipped micidial_v2.html = 67,041 B (over cap) — that is the v0.1 number; §12 and on-disk files say 65,288 B (v0.2 layout). Tags are only v0.1 & v0.3; commit a3ffba2 (v0.2 release) was never tagged. [MICIDIAL_V2.md:3]
+- Open issues cite files no longer in the tree: #0014 names v2/assemble_v02.py (absent; on-disk v2/assemble.py is the committed v0.2-layout producer since v0.3), #0011/#0012/#0013 name v2/shader_optimized.glsl & hybrid_shader_p5.min.glsl (never committed). Treat those flags as stale until re-verified. [v2/]
+- PROJECT_MAP.md refreshed this session: dropped the gone micidial/ folder & uncompressed.html entries; documented tracked root artifacts v01/v02/v21, docs list, terser-only deps, and offline Node verify tooling (no Playwright). [.projectmem/PROJECT_MAP.md]
+- Gotcha: .gitignore does NOT cover v2/build/boot.min.js, engine.js, outer.js (only *.bin/json/txt/pkl + synth.min.js), so a full pipeline run leaves 3 untracked regenerables in the tree despite the 'keep only rerun inputs' cleanup policy. [.gitignore / v2/build]
 
 ## Key files
 - `original/PRESSURE_ATBS135_v13.html`
